@@ -1,0 +1,242 @@
+-- Lucky GUI Full Version with All Cheats and Tween Add-On
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+local humanoid = char:WaitForChild("Humanoid")
+
+-- Draggable helper
+local function makeDraggable(frame)
+    local dragging, dragStart, startPos = false, nil, nil
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging, dragStart, startPos = true, input.Position, frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging=false end
+            end)
+        end
+    end)
+    frame.InputChanged:Connect(function(input)
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
+                                       startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        end
+    end)
+end
+
+-- DESYNC
+local desyncActive = false
+local function enableMobileDesync()
+    local success, error = pcall(function()
+        local backpack = player:WaitForChild("Backpack")
+        local packages = ReplicatedStorage:WaitForChild("Packages",5)
+        local netFolder = packages:WaitForChild("Net",5)
+        local useItemRemote = netFolder:WaitForChild("RE/UseItem",5)
+        local teleportRemote = netFolder:WaitForChild("RE/QuantumCloner/OnTeleport",5)
+
+        local toolNames = {"Quantum Cloner","Brainrot","brainrot"}
+        local tool
+        for _, tName in ipairs(toolNames) do
+            tool = backpack:FindFirstChild(tName) or char:FindFirstChild(tName)
+            if tool then break end
+        end
+        if not tool then
+            for _, item in ipairs(backpack:GetChildren()) do
+                if item:IsA("Tool") then tool=item break end
+            end
+        end
+        if tool and tool.Parent==backpack then humanoid:EquipTool(tool) task.wait(0.5) end
+
+        if setfflag then setfflag("WorldStepMax","-9999999999") end
+        task.wait(0.2)
+        useItemRemote:FireServer()
+        task.wait(1)
+        teleportRemote:FireServer()
+        task.wait(2)
+        if setfflag then setfflag("WorldStepMax","-1") end
+        return true
+    end)
+    if not success then warn("Desync error: "..tostring(error)) return false end
+    return success
+end
+local function disableMobileDesync()
+    pcall(function() if setfflag then setfflag("WorldStepMax","-1") end end)
+end
+player.CharacterAdded:Connect(function()
+    desyncActive = false
+    disableMobileDesync()
+end)
+
+-- Custom Tween
+local function tweenToPosition(targetPos, speed)
+    speed = speed or 5
+    local conn
+    conn = RunService.RenderStepped:Connect(function(dt)
+        if not hrp then conn:Disconnect() return end
+        hrp.CFrame = CFrame.new(hrp.Position:Lerp(targetPos, dt*speed))
+        if (hrp.Position - targetPos).Magnitude < 0.1 then
+            hrp.CFrame = CFrame.new(targetPos)
+            conn:Disconnect()
+        end
+    end)
+end
+
+-- Tween GUI
+local function spawnTweenGUI(mainFrame)
+    local gui = Instance.new("ScreenGui", player.PlayerGui)
+    gui.Name = "TweenGUI"
+
+    local frame = Instance.new("Frame", gui)
+    frame.Size = UDim2.new(0,220,0,150)
+    frame.Position = UDim2.new(0, mainFrame.AbsolutePosition.X, 0, mainFrame.AbsolutePosition.Y + mainFrame.AbsoluteSize.Y)
+    frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
+    frame.Active = true
+    makeDraggable(frame)
+
+    local uC = Instance.new("UICorner", frame); uC.CornerRadius = UDim.new(0,10)
+    local uiStroke = Instance.new("UIStroke", frame); uiStroke.Thickness, uiStroke.Color = 2, Color3.fromRGB(0,255,0)
+
+    local title = Instance.new("TextLabel", frame)
+    title.Size = UDim2.new(1,0,0,30); title.Position = UDim2.new(0,0,0,10)
+    title.Text, title.BackgroundTransparency, title.TextColor3, title.Font, title.TextSize =
+        "Tween Controller",1,Color3.fromRGB(0,255,0),Enum.Font.Arcade,20
+
+    local basePos = nil
+    local function createButton(text, y, cb)
+        local btn = Instance.new("TextButton", frame)
+        btn.Size, btn.Position = UDim2.new(1,-20,0,40), UDim2.new(0,10,y,0)
+        btn.Text, btn.BackgroundColor3, btn.TextColor3, btn.Font, btn.TextSize, btn.BorderSizePixel =
+            text, Color3.fromRGB(25,25,25), Color3.fromRGB(255,255,255), Enum.Font.Arcade, 18, 0
+        local uC = Instance.new("UICorner", btn); uC.CornerRadius = UDim.new(0,8)
+        btn.MouseEnter:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(35,35,35) end)
+        btn.MouseLeave:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(25,25,25) end)
+        btn.MouseButton1Click:Connect(cb)
+        return btn
+    end
+
+    createButton("Set Base",50,function() basePos = hrp.Position end)
+    createButton("Go To Base",110,function() if basePos then tweenToPosition(basePos,5) end end)
+end
+
+-- Main Lucky GUI
+local function createLuckyGUI()
+    local oldGui = player.PlayerGui:FindFirstChild("LuckyMenu")
+    if oldGui then oldGui:Destroy() end
+
+    local gui = Instance.new("ScreenGui", player.PlayerGui)
+    gui.Name = "LuckyMenu"
+
+    local frame = Instance.new("Frame", gui)
+    frame.Size, frame.Position = UDim2.new(0,300,0,600), UDim2.new(0.1,0,0.2,0)
+    frame.BackgroundColor3 = Color3.fromRGB(20,20,20); frame.Active = true
+    makeDraggable(frame)
+
+    local uC = Instance.new("UICorner", frame); uC.CornerRadius = UDim.new(0,10)
+    local uiStroke = Instance.new("UIStroke", frame); uiStroke.Thickness, uiStroke.Color = 2, Color3.fromRGB(0,255,0)
+
+    local title = Instance.new("TextLabel", frame)
+    title.Size = UDim2.new(1,0,0,30); title.BackgroundTransparency = 1
+    title.Text, title.TextColor3, title.Font, title.TextSize = "ttk: lucky", Color3.fromRGB(0,255,0), Enum.Font.Arcade, 20
+
+    local desyncActive, infJumpActive, stealFloorActive = false,false,false
+    local floatActive, jumpBoostActive, flyActive, speedActive = false,false,false,false
+    local floatConn, flyConn, jumpConn, speedConn
+    local platform
+
+    local function createButton(name,y,cb)
+        local btn = Instance.new("TextButton", frame)
+        btn.Size, btn.Position = UDim2.new(1,-20,0,40), UDim2.new(0,10,y,0)
+        btn.Text, btn.BackgroundColor3, btn.TextColor3, btn.Font, btn.TextSize, btn.BorderSizePixel =
+            name, Color3.fromRGB(25,25,25), Color3.fromRGB(255,255,255), Enum.Font.Arcade, 18, 0
+        local uC = Instance.new("UICorner", btn); uC.CornerRadius = UDim.new(0,8)
+        btn.MouseEnter:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(35,35,35) end)
+        btn.MouseLeave:Connect(function() btn.BackgroundColor3 = Color3.fromRGB(25,25,25) end)
+        btn.MouseButton1Click:Connect(cb)
+        return btn
+    end
+
+    -- Cheats buttons
+    createButton("DESYNC",50,function()
+        desyncActive = not desyncActive
+        if desyncActive then enableMobileDesync() else disableMobileDesync() end
+    end)
+
+    createButton("INF JUMP",110,function()
+        infJumpActive = not infJumpActive
+        if infJumpActive then
+            humanoid.Jumping:Connect(function() humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end)
+        end
+    end)
+
+    createButton("STEAL FLOOR",170,function()
+        stealFloorActive = not stealFloorActive
+        if stealFloorActive then
+            platform = Instance.new("Part")
+            platform.Size, platform.Anchored, platform.Position = Vector3.new(10,1,10), true, hrp.Position - Vector3.new(0,5,0)
+            platform.Parent = Workspace
+        else
+            if platform then platform:Destroy() end
+        end
+    end)
+
+    createButton("FLOAT",230,function()
+        floatActive = not floatActive
+        if floatActive then
+            floatConn = RunService.RenderStepped:Connect(function()
+                hrp.Velocity = Vector3.new(0,50,0)
+            end)
+        else
+            if floatConn then floatConn:Disconnect() end
+        end
+    end)
+
+    createButton("JUMP BOOST",290,function()
+        jumpBoostActive = not jumpBoostActive
+        if jumpBoostActive then
+            jumpConn = humanoid.Jumping:Connect(function() hrp.Velocity = hrp.Velocity + Vector3.new(0,50,0) end)
+        else
+            if jumpConn then jumpConn:Disconnect() end
+        end
+    end)
+
+    createButton("FLY",350,function()
+        flyActive = not flyActive
+        if flyActive then
+            flyConn = RunService.RenderStepped:Connect(function()
+                local cam = Workspace.CurrentCamera
+                local mv = Vector3.new()
+                if UserInputService:IsKeyDown(Enum.KeyCode.W) then mv += cam.CFrame.LookVector*2 end
+                if UserInputService:IsKeyDown(Enum.KeyCode.S) then mv -= cam.CFrame.LookVector*2 end
+                if UserInputService:IsKeyDown(Enum.KeyCode.A) then mv -= cam.CFrame.RightVector*2 end
+                if UserInputService:IsKeyDown(Enum.KeyCode.D) then mv += cam.CFrame.RightVector*2 end
+                hrp.Velocity = mv
+            end)
+        else
+            if flyConn then flyConn:Disconnect() end
+        end
+    end)
+
+    createButton("SPEED BOOST",410,function()
+        speedActive = not speedActive
+        if speedActive then
+            speedConn = RunService.RenderStepped:Connect(function()
+                hrp.Velocity = hrp.Velocity*2
+            end)
+        else
+            if speedConn then speedConn:Disconnect() end
+        end
+    end)
+
+    createButton("Open Tween GUI",540,function()
+        if not player.PlayerGui:FindFirstChild("TweenGUI") then spawnTweenGUI(frame) end
+    end)
+end
+
+createLuckyGUI()
